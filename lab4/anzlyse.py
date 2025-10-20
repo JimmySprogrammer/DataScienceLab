@@ -1,106 +1,174 @@
-import os
-import pandas as pd
-import sqlite3
-
-data_dir = r"D:\DataScienceLab\lab4\data"
-db_path = os.path.join(data_dir, "university_ranking.db")
-
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
-
-cursor.execute("DROP TABLE IF EXISTS rankings")
-cursor.execute("""
-CREATE TABLE rankings (
-    subject TEXT,
-    rank INTEGER,
-    institution TEXT,
-    country TEXT,
-    documents INTEGER,
-    cites INTEGER,
-    cites_per_paper REAL,
-    top_papers INTEGER
-)
-""")
-
-def clean_and_load_csv(file_path, subject):
-    for enc in ["utf-8", "gbk", "latin1"]:
-        try:
-            df = pd.read_csv(file_path, encoding=enc, skiprows=1)
-            break
-        except Exception:
-            df = None
-    if df is None or df.shape[1] < 2:
-        print(f"⚠️ 无法读取: {file_path}")
-        return
-
-    df.columns = [str(c).strip() for c in df.columns]
-    df = df.dropna(how="all")
-    df = df.rename(columns={
-        df.columns[0]: "rank",
-        df.columns[1]: "institution",
-        df.columns[2]: "country",
-        df.columns[3]: "documents",
-        df.columns[4]: "cites",
-        df.columns[5]: "cites_per_paper",
-        df.columns[-1]: "top_papers"
-    })
-    df["subject"] = subject
-    df = df[["subject", "rank", "institution", "country", "documents", "cites", "cites_per_paper", "top_papers"]]
-    df.to_sql("rankings", conn, if_exists="append", index=False)
-    print(f"✅ 导入成功: {subject} ({len(df)} rows)")
-
-# 批量导入所有 CSV
-for file in os.listdir(data_dir):
-    if file.endswith(".csv"):
-        subject = file.replace(".csv", "")
-        clean_and_load_csv(os.path.join(data_dir, file), subject)
-
-# === 查询 1: 华东师范大学在各学科的排名 ===
-sql_ecnu = """
-SELECT subject, rank, cites_per_paper, documents, top_papers
-FROM rankings
-WHERE institution LIKE '%EAST CHINA NORMAL UNIVERSITY%'
-ORDER BY rank;
-"""
-ecnu_df = pd.read_sql_query(sql_ecnu, conn)
-print("\n华东师范大学(ECNU) 各学科表现:")
-print(ecnu_df if not ecnu_df.empty else "未找到记录")
-
-# === 查询 2: 中国大陆高校在各学科的表现 ===
-sql_china = """
-SELECT subject,
-       COUNT(*) AS num_institutions,
-       AVG(rank) AS avg_rank,
-       SUM(CASE WHEN rank <= 10 THEN 1 ELSE 0 END) AS top10,
-       SUM(CASE WHEN rank <= 100 THEN 1 ELSE 0 END) AS top100
-FROM rankings
-WHERE country LIKE '%CHINA MAINLAND%'
-GROUP BY subject;
-"""
-china_df = pd.read_sql_query(sql_china, conn)
-print("\n中国大陆高校总体表现:")
-print(china_df.head(10))
-
-# === 查询 3: 全球各地区表现 ===
-sql_region = """
-SELECT subject,
-       country,
-       COUNT(*) AS num_institutions,
-       AVG(rank) AS avg_rank
-FROM rankings
-GROUP BY subject, country
-ORDER BY subject, avg_rank;
-"""
-region_df = pd.read_sql_query(sql_region, conn)
-print("\n全球地区表现（前5行示例）:")
-print(region_df.head(5))
-
-# 导出结果
-output_path = os.path.join(data_dir, "analysis_results.xlsx")
-with pd.ExcelWriter(output_path) as writer:
-    ecnu_df.to_excel(writer, sheet_name="ECNU", index=False)
-    china_df.to_excel(writer, sheet_name="China", index=False)
-    region_df.to_excel(writer, sheet_name="Regions", index=False)
-
-print(f"\n✅ 已保存分析结果到: {output_path}")
-conn.close()
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "e1b38535",
+   "metadata": {},
+   "outputs": [
+    {
+     "ename": "UnicodeDecodeError",
+     "evalue": "'gbk' codec can't decode byte 0xa9 in position 107121: illegal multibyte sequence",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[1;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[1;31mUnicodeDecodeError\u001b[0m                        Traceback (most recent call last)",
+      "File \u001b[1;32mparsers.pyx:1120\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._convert_tokens\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:1272\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._convert_with_dtype\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:1285\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._string_convert\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:1535\u001b[0m, in \u001b[0;36mpandas._libs.parsers._string_box_utf8\u001b[1;34m()\u001b[0m\n",
+      "\u001b[1;31mUnicodeDecodeError\u001b[0m: 'utf-8' codec can't decode byte 0xa9 in position 10: invalid start byte",
+      "\nDuring handling of the above exception, another exception occurred:\n",
+      "\u001b[1;31mUnicodeDecodeError\u001b[0m                        Traceback (most recent call last)",
+      "Cell \u001b[1;32mIn[2], line 17\u001b[0m\n\u001b[0;32m     16\u001b[0m \u001b[38;5;28;01mtry\u001b[39;00m:\n\u001b[1;32m---> 17\u001b[0m     df \u001b[38;5;241m=\u001b[39m pd\u001b[38;5;241m.\u001b[39mread_csv(file_path, encoding\u001b[38;5;241m=\u001b[39m\u001b[38;5;124m'\u001b[39m\u001b[38;5;124mutf-8\u001b[39m\u001b[38;5;124m'\u001b[39m)\n\u001b[0;32m     18\u001b[0m \u001b[38;5;28;01mexcept\u001b[39;00m \u001b[38;5;167;01mUnicodeDecodeError\u001b[39;00m:\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\readers.py:1026\u001b[0m, in \u001b[0;36mread_csv\u001b[1;34m(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, verbose, skip_blank_lines, parse_dates, infer_datetime_format, keep_date_col, date_parser, date_format, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, encoding_errors, dialect, on_bad_lines, delim_whitespace, low_memory, memory_map, float_precision, storage_options, dtype_backend)\u001b[0m\n\u001b[0;32m   1024\u001b[0m kwds\u001b[38;5;241m.\u001b[39mupdate(kwds_defaults)\n\u001b[1;32m-> 1026\u001b[0m \u001b[38;5;28;01mreturn\u001b[39;00m _read(filepath_or_buffer, kwds)\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\readers.py:626\u001b[0m, in \u001b[0;36m_read\u001b[1;34m(filepath_or_buffer, kwds)\u001b[0m\n\u001b[0;32m    625\u001b[0m \u001b[38;5;28;01mwith\u001b[39;00m parser:\n\u001b[1;32m--> 626\u001b[0m     \u001b[38;5;28;01mreturn\u001b[39;00m parser\u001b[38;5;241m.\u001b[39mread(nrows)\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\readers.py:1923\u001b[0m, in \u001b[0;36mTextFileReader.read\u001b[1;34m(self, nrows)\u001b[0m\n\u001b[0;32m   1917\u001b[0m \u001b[38;5;28;01mtry\u001b[39;00m:\n\u001b[0;32m   1918\u001b[0m     \u001b[38;5;66;03m# error: \"ParserBase\" has no attribute \"read\"\u001b[39;00m\n\u001b[0;32m   1919\u001b[0m     (\n\u001b[0;32m   1920\u001b[0m         index,\n\u001b[0;32m   1921\u001b[0m         columns,\n\u001b[0;32m   1922\u001b[0m         col_dict,\n\u001b[1;32m-> 1923\u001b[0m     ) \u001b[38;5;241m=\u001b[39m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39m_engine\u001b[38;5;241m.\u001b[39mread(  \u001b[38;5;66;03m# type: ignore[attr-defined]\u001b[39;00m\n\u001b[0;32m   1924\u001b[0m         nrows\n\u001b[0;32m   1925\u001b[0m     )\n\u001b[0;32m   1926\u001b[0m \u001b[38;5;28;01mexcept\u001b[39;00m \u001b[38;5;167;01mException\u001b[39;00m:\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\c_parser_wrapper.py:234\u001b[0m, in \u001b[0;36mCParserWrapper.read\u001b[1;34m(self, nrows)\u001b[0m\n\u001b[0;32m    233\u001b[0m \u001b[38;5;28;01mif\u001b[39;00m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39mlow_memory:\n\u001b[1;32m--> 234\u001b[0m     chunks \u001b[38;5;241m=\u001b[39m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39m_reader\u001b[38;5;241m.\u001b[39mread_low_memory(nrows)\n\u001b[0;32m    235\u001b[0m     \u001b[38;5;66;03m# destructive to chunks\u001b[39;00m\n",
+      "File \u001b[1;32mparsers.pyx:838\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader.read_low_memory\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:921\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._read_rows\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:1066\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._convert_column_data\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:1127\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._convert_tokens\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:1272\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._convert_with_dtype\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:1285\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._string_convert\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:1535\u001b[0m, in \u001b[0;36mpandas._libs.parsers._string_box_utf8\u001b[1;34m()\u001b[0m\n",
+      "\u001b[1;31mUnicodeDecodeError\u001b[0m: 'utf-8' codec can't decode byte 0xa9 in position 10: invalid start byte",
+      "\nDuring handling of the above exception, another exception occurred:\n",
+      "\u001b[1;31mUnicodeDecodeError\u001b[0m                        Traceback (most recent call last)",
+      "Cell \u001b[1;32mIn[2], line 19\u001b[0m\n\u001b[0;32m     17\u001b[0m     df \u001b[38;5;241m=\u001b[39m pd\u001b[38;5;241m.\u001b[39mread_csv(file_path, encoding\u001b[38;5;241m=\u001b[39m\u001b[38;5;124m'\u001b[39m\u001b[38;5;124mutf-8\u001b[39m\u001b[38;5;124m'\u001b[39m)\n\u001b[0;32m     18\u001b[0m \u001b[38;5;28;01mexcept\u001b[39;00m \u001b[38;5;167;01mUnicodeDecodeError\u001b[39;00m:\n\u001b[1;32m---> 19\u001b[0m     df \u001b[38;5;241m=\u001b[39m pd\u001b[38;5;241m.\u001b[39mread_csv(file_path, encoding\u001b[38;5;241m=\u001b[39m\u001b[38;5;124m'\u001b[39m\u001b[38;5;124mgbk\u001b[39m\u001b[38;5;124m'\u001b[39m)\n\u001b[0;32m     20\u001b[0m df[\u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mSubject\u001b[39m\u001b[38;5;124m\"\u001b[39m] \u001b[38;5;241m=\u001b[39m subject\n\u001b[0;32m     21\u001b[0m all_data\u001b[38;5;241m.\u001b[39mappend(df)\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\readers.py:1026\u001b[0m, in \u001b[0;36mread_csv\u001b[1;34m(filepath_or_buffer, sep, delimiter, header, names, index_col, usecols, dtype, engine, converters, true_values, false_values, skipinitialspace, skiprows, skipfooter, nrows, na_values, keep_default_na, na_filter, verbose, skip_blank_lines, parse_dates, infer_datetime_format, keep_date_col, date_parser, date_format, dayfirst, cache_dates, iterator, chunksize, compression, thousands, decimal, lineterminator, quotechar, quoting, doublequote, escapechar, comment, encoding, encoding_errors, dialect, on_bad_lines, delim_whitespace, low_memory, memory_map, float_precision, storage_options, dtype_backend)\u001b[0m\n\u001b[0;32m   1013\u001b[0m kwds_defaults \u001b[38;5;241m=\u001b[39m _refine_defaults_read(\n\u001b[0;32m   1014\u001b[0m     dialect,\n\u001b[0;32m   1015\u001b[0m     delimiter,\n\u001b[1;32m   (...)\u001b[0m\n\u001b[0;32m   1022\u001b[0m     dtype_backend\u001b[38;5;241m=\u001b[39mdtype_backend,\n\u001b[0;32m   1023\u001b[0m )\n\u001b[0;32m   1024\u001b[0m kwds\u001b[38;5;241m.\u001b[39mupdate(kwds_defaults)\n\u001b[1;32m-> 1026\u001b[0m \u001b[38;5;28;01mreturn\u001b[39;00m _read(filepath_or_buffer, kwds)\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\readers.py:620\u001b[0m, in \u001b[0;36m_read\u001b[1;34m(filepath_or_buffer, kwds)\u001b[0m\n\u001b[0;32m    617\u001b[0m _validate_names(kwds\u001b[38;5;241m.\u001b[39mget(\u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mnames\u001b[39m\u001b[38;5;124m\"\u001b[39m, \u001b[38;5;28;01mNone\u001b[39;00m))\n\u001b[0;32m    619\u001b[0m \u001b[38;5;66;03m# Create the parser.\u001b[39;00m\n\u001b[1;32m--> 620\u001b[0m parser \u001b[38;5;241m=\u001b[39m TextFileReader(filepath_or_buffer, \u001b[38;5;241m*\u001b[39m\u001b[38;5;241m*\u001b[39mkwds)\n\u001b[0;32m    622\u001b[0m \u001b[38;5;28;01mif\u001b[39;00m chunksize \u001b[38;5;129;01mor\u001b[39;00m iterator:\n\u001b[0;32m    623\u001b[0m     \u001b[38;5;28;01mreturn\u001b[39;00m parser\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\readers.py:1620\u001b[0m, in \u001b[0;36mTextFileReader.__init__\u001b[1;34m(self, f, engine, **kwds)\u001b[0m\n\u001b[0;32m   1617\u001b[0m     \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39moptions[\u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mhas_index_names\u001b[39m\u001b[38;5;124m\"\u001b[39m] \u001b[38;5;241m=\u001b[39m kwds[\u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mhas_index_names\u001b[39m\u001b[38;5;124m\"\u001b[39m]\n\u001b[0;32m   1619\u001b[0m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39mhandles: IOHandles \u001b[38;5;241m|\u001b[39m \u001b[38;5;28;01mNone\u001b[39;00m \u001b[38;5;241m=\u001b[39m \u001b[38;5;28;01mNone\u001b[39;00m\n\u001b[1;32m-> 1620\u001b[0m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39m_engine \u001b[38;5;241m=\u001b[39m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39m_make_engine(f, \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39mengine)\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\readers.py:1898\u001b[0m, in \u001b[0;36mTextFileReader._make_engine\u001b[1;34m(self, f, engine)\u001b[0m\n\u001b[0;32m   1895\u001b[0m     \u001b[38;5;28;01mraise\u001b[39;00m \u001b[38;5;167;01mValueError\u001b[39;00m(msg)\n\u001b[0;32m   1897\u001b[0m \u001b[38;5;28;01mtry\u001b[39;00m:\n\u001b[1;32m-> 1898\u001b[0m     \u001b[38;5;28;01mreturn\u001b[39;00m mapping[engine](f, \u001b[38;5;241m*\u001b[39m\u001b[38;5;241m*\u001b[39m\u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39moptions)\n\u001b[0;32m   1899\u001b[0m \u001b[38;5;28;01mexcept\u001b[39;00m \u001b[38;5;167;01mException\u001b[39;00m:\n\u001b[0;32m   1900\u001b[0m     \u001b[38;5;28;01mif\u001b[39;00m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39mhandles \u001b[38;5;129;01mis\u001b[39;00m \u001b[38;5;129;01mnot\u001b[39;00m \u001b[38;5;28;01mNone\u001b[39;00m:\n",
+      "File \u001b[1;32mc:\\Users\\19691\\anaconda3\\Lib\\site-packages\\pandas\\io\\parsers\\c_parser_wrapper.py:93\u001b[0m, in \u001b[0;36mCParserWrapper.__init__\u001b[1;34m(self, src, **kwds)\u001b[0m\n\u001b[0;32m     90\u001b[0m \u001b[38;5;28;01mif\u001b[39;00m kwds[\u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mdtype_backend\u001b[39m\u001b[38;5;124m\"\u001b[39m] \u001b[38;5;241m==\u001b[39m \u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mpyarrow\u001b[39m\u001b[38;5;124m\"\u001b[39m:\n\u001b[0;32m     91\u001b[0m     \u001b[38;5;66;03m# Fail here loudly instead of in cython after reading\u001b[39;00m\n\u001b[0;32m     92\u001b[0m     import_optional_dependency(\u001b[38;5;124m\"\u001b[39m\u001b[38;5;124mpyarrow\u001b[39m\u001b[38;5;124m\"\u001b[39m)\n\u001b[1;32m---> 93\u001b[0m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39m_reader \u001b[38;5;241m=\u001b[39m parsers\u001b[38;5;241m.\u001b[39mTextReader(src, \u001b[38;5;241m*\u001b[39m\u001b[38;5;241m*\u001b[39mkwds)\n\u001b[0;32m     95\u001b[0m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39munnamed_cols \u001b[38;5;241m=\u001b[39m \u001b[38;5;28mself\u001b[39m\u001b[38;5;241m.\u001b[39m_reader\u001b[38;5;241m.\u001b[39munnamed_cols\n\u001b[0;32m     97\u001b[0m \u001b[38;5;66;03m# error: Cannot determine type of 'names'\u001b[39;00m\n",
+      "File \u001b[1;32mparsers.pyx:574\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader.__cinit__\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:663\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._get_header\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:874\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._tokenize_rows\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:891\u001b[0m, in \u001b[0;36mpandas._libs.parsers.TextReader._check_tokenize_status\u001b[1;34m()\u001b[0m\n",
+      "File \u001b[1;32mparsers.pyx:2053\u001b[0m, in \u001b[0;36mpandas._libs.parsers.raise_parser_error\u001b[1;34m()\u001b[0m\n",
+      "\u001b[1;31mUnicodeDecodeError\u001b[0m: 'gbk' codec can't decode byte 0xa9 in position 107121: illegal multibyte sequence"
+     ]
+    }
+   ],
+   "source": [
+    "import os\n",
+    "import pandas as pd\n",
+    "import sqlite3\n",
+    "\n",
+    "data_dir = r\"D:\\DataScienceLab\\lab4\\data\"\n",
+    "db_path = os.path.join(data_dir, \"university.db\")\n",
+    "\n",
+    "csv_files = [f for f in os.listdir(data_dir) if f.endswith(\".csv\")]\n",
+    "if not csv_files:\n",
+    "    raise FileNotFoundError(\"没有找到任何 CSV 文件，请检查路径！\")\n",
+    "\n",
+    "all_data = []\n",
+    "for file in csv_files:\n",
+    "    subject = os.path.splitext(file)[0]\n",
+    "    file_path = os.path.join(data_dir, file)\n",
+    "    try:\n",
+    "        df = pd.read_csv(file_path, encoding='utf-8')\n",
+    "    except UnicodeDecodeError:\n",
+    "        df = pd.read_csv(file_path, encoding='gbk')\n",
+    "    df[\"Subject\"] = subject\n",
+    "    all_data.append(df)\n",
+    "\n",
+    "data = pd.concat(all_data, ignore_index=True)\n",
+    "print(f\"共加载 {len(csv_files)} 个学科文件，总计 {len(data)} 条记录。\")\n",
+    "\n",
+    "data.columns = [c.strip().replace(\" \", \"_\").lower() for c in data.columns]\n",
+    "if \"university\" not in data.columns:\n",
+    "    for c in data.columns:\n",
+    "        if \"univer\" in c:\n",
+    "            data.rename(columns={c: \"university\"}, inplace=True)\n",
+    "            break\n",
+    "if \"country\" not in data.columns:\n",
+    "    for c in data.columns:\n",
+    "        if \"country\" in c:\n",
+    "            data.rename(columns={c: \"country\"}, inplace=True)\n",
+    "            break\n",
+    "if \"region\" not in data.columns:\n",
+    "    data[\"region\"] = data[\"country\"]\n",
+    "if \"rank\" not in data.columns:\n",
+    "    for c in data.columns:\n",
+    "        if \"rank\" in c:\n",
+    "            data.rename(columns={c: \"rank\"}, inplace=True)\n",
+    "            break\n",
+    "\n",
+    "data = data[[\"university\", \"country\", \"region\", \"subject\", \"rank\"]].dropna()\n",
+    "\n",
+    "conn = sqlite3.connect(db_path)\n",
+    "data.to_sql(\"university_rankings\", conn, if_exists=\"replace\", index=False)\n",
+    "print(\"✅ 数据已导入 SQLite 数据库：university_rankings\")\n",
+    "\n",
+    "# SQL 查询\n",
+    "query_ecnu = \"\"\"\n",
+    "SELECT subject, rank\n",
+    "FROM university_rankings\n",
+    "WHERE university LIKE '%East China Normal%' OR university LIKE '%华东师范%'\n",
+    "ORDER BY rank;\n",
+    "\"\"\"\n",
+    "ecnu_rank = pd.read_sql_query(query_ecnu, conn)\n",
+    "print(\"\\n🎓 华东师范大学在各学科的排名：\")\n",
+    "display(ecnu_rank)\n",
+    "\n",
+    "query_china = \"\"\"\n",
+    "SELECT subject,\n",
+    "       COUNT(*) AS num_universities,\n",
+    "       AVG(rank) AS avg_rank\n",
+    "FROM university_rankings\n",
+    "WHERE country LIKE '%China%'\n",
+    "GROUP BY subject\n",
+    "ORDER BY avg_rank;\n",
+    "\"\"\"\n",
+    "china_perf = pd.read_sql_query(query_china, conn)\n",
+    "print(\"\\n🇨🇳 中国（大陆）大学在各学科的表现：\")\n",
+    "display(china_perf)\n",
+    "\n",
+    "query_region = \"\"\"\n",
+    "SELECT region,\n",
+    "       subject,\n",
+    "       AVG(rank) AS avg_rank,\n",
+    "       COUNT(*) AS num_universities\n",
+    "FROM university_rankings\n",
+    "GROUP BY region, subject\n",
+    "ORDER BY subject, avg_rank;\n",
+    "\"\"\"\n",
+    "region_perf = pd.read_sql_query(query_region, conn)\n",
+    "print(\"\\n🌍 全球不同区域在各学科的表现：\")\n",
+    "display(region_perf)\n",
+    "\n",
+    "excel_path = os.path.join(data_dir, \"analysis_results.xlsx\")\n",
+    "with pd.ExcelWriter(excel_path) as writer:\n",
+    "    ecnu_rank.to_excel(writer, sheet_name=\"ECNU_Ranking\", index=False)\n",
+    "    china_perf.to_excel(writer, sheet_name=\"China_Performance\", index=False)\n",
+    "    region_perf.to_excel(writer, sheet_name=\"Global_Regions\", index=False)\n",
+    "\n",
+    "print(f\"\\n📁 分析结果已导出到: {excel_path}\")\n",
+    "conn.close()\n",
+    "\n"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "base",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.13.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
